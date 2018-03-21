@@ -34,6 +34,8 @@ XGBoost(eXtreme Gradient Boosting) 是梯度提升的一种新的实现。阅读
 
 并行处理，使得XGBoost比GBM快超级多。但是我们知道XGBoost是一个顺序执行的模型，怎么能并行化呢。每棵树都必须在前面的树生成之后，才能被建立，那是怎么实现的呢？http://zhanpengfang.github.io/418home.html 里面有提到。**有待探究...**
 
+注意xgboost的并行不是tree粒度的并行，xgboost也是一次迭代完才能进行下一次迭代的（第t次迭代的代价函数里包含了前面t-1次迭代的预测值）。xgboost的并行是在特征粒度上的。我们知道，决策树的学习最耗时的一个步骤就是对特征的值进行排序（因为要确定最佳分割点），xgboost在训练之前，预先对数据进行了排序，然后保存为block结构，后面的迭代中重复地使用这个结构，大大减小计算量。这个block结构也使得并行成为了可能，在进行节点的分裂时，需要计算每个特征的增益，最终选增益最大的那个特征去做分裂，那么各个特征的增益计算就可以开多线程进行。
+
 据称，XGBoost可以在Hadoop上实现。
 
 ### （3）高灵活性
@@ -95,6 +97,7 @@ gblinear: linear models (线性模型)
 
 * **eta [default=0.3]**
 每次迭代，学习率的衰减量。类似于GBM中的学习率？通常的取值在0.01-0.2之间。
+Shrinkage（缩减），相当于学习速率（xgboost中的eta）。xgboost在进行完一次迭代后，会将叶子节点的权重乘上该系数，主要是为了削弱每棵树的影响，让后面有更大的学习空间。实际应用中，一般把eta设置得小一点，然后迭代次数设置得大一点。（补充：传统GBDT的实现也有学习速率）
 
 * **min_child_weight [default=1]**
 定义生成一个子节点，需要的最小的权重观测值。
@@ -114,26 +117,52 @@ gblinear: linear models (线性模型)
 * max_delta_step [default=0]
 这参数限制每棵树权重改变的最大步长。如果这个参数的值为0，那就意味着没有约束。如果它被赋予了某个正值，那么它会让这个算法更加保守。 通常，这个参数不需要设置。但是当各类别的样本十分不平衡时，它对逻辑回归是很有帮助的。
 
-* subsample [default=1]
+* **subsample** [default=1]
 这个参数控制对于每棵树，随机采样的比例。 减小这个参数的值，算法会更加保守，避免过拟合。但是，如果这个值设置得过小，它可能会导致欠拟合。 典型值：0.5-1
 
-8. colsample_bytree [default=1]
+* **colsample_bytree** [default=1]
 用来控制每棵随机采样的列数的占比(每一列是一个特征)。 典型值：0.5-1。类似于随机森林对特征数量的随机选择。
 
-9. colsample_bylevel [default=1]
-Denotes the subsample ratio of columns for each split, in each level.
-I don’t use this often because subsample and colsample_bytree will do the job for
-you. but you can explore further if you feel so.
-10. lambda [default=1]
-L2 regularization term on weights (analogous to Ridge regression)
-This used to handle the regularization part of XGBoost. Though many data scientists don’t
-use it often, it should be explored to reduce over􀃚tting.
-11. alpha [default=0]
-L1 regularization term on weight (analogous to Lasso regression)
-Can be used in case of very high dimensionality so that the algorithm runs faster when
-implemented
-12. scale_pos_weight [default=1]
-A value greater than 0 should be used in case of high class imbalance as it helps in faster
-convergence.
+* colsample_bylevel [default=1]
+用来控制树的每一级的每一次分裂，对列数的采样的占比。 感觉和colsample_bytree差不多。
+
+* **lambda** [default=1]
+L2正则化项的权重。(和Ridge regression类似)。 这个参数是用来控制XGBoost的正则化部分的。虽然大部分数据科学家很少用到这个参数，但是这个参数在减少过拟合上还是有很多用处的。
+
+* **alpha** [default=0]
+权重的L1正则化项。(和Lasso regression类似)。 可以应用在很高维度的情况下，使得算法的速度更快。
+
+* scale_pos_weight [default=1]
+在各类别样本十分不平衡时，把这个参数设定为一个正值，可以使算法更快收敛。
 
 ### （3）学习任务的参数
+
+这些参数是用来控制理想的优化目标和每一步结果的度量方法。
+
+* objective[默认reg:linear]
+这个参数定义需要被最小化的损失函数。
+最常用的值有：
+  binary:logistic 二分类的逻辑回归，返回预测的概率(不是类别)。
+  multi:softmax 使用softmax的多分类器，返回预测的类别(不是概率)。在这种情况下，你还需要多设一个参数：num_class(类别数目)。
+  multi:softprob 和 multi:softmax参数一样，但是返回的是每个数据属于各个类别的概率。
+
+* eval_metric[默认值取决于objective参数的取值]
+  用来度量验证数据的度量方法。回归默认是rmse，分类默认是error
+  典型的值是：
+  * rmse： 均方误差
+  * mae：评价绝对误差
+  * logloss：负的log相似度
+  * error：二分类的错误率（0.5的阈值）
+  * merror：多累分类错误率
+  * mlogloss：多分类log误差
+  * auc：area under the curve
+
+* seed(默认0)
+随机数的种子 设置它可以复现随机数据的结果，也可以用于调整参数。
+
+如果你之前用的是Scikit-learn,你可能不太熟悉这些参数。但是有个好消息，python的XGBoost模块有一个sklearn包，XGBClassifier。这个包中的参数是按sklearn风格命名的。会改变的参数名是：
+* eta ->learning_rate(其实和学习率还是有一点点区别的，用于衰减本次学习到的树的结果，就是一个权重p)
+* lambda->reg_lambda
+* alpha->reg_alpha
+
+你肯定在疑惑为啥咱们没有介绍和GBM中的’n_estimators’类似的参数。XGBClassifier中确实有一个类似的参数，但是，是在标准XGBoost实现中调用拟合函数时，把它作为’num_boosting_rounds’参数传入。
