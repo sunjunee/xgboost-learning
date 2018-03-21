@@ -3,7 +3,8 @@
 
 翻译自：https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/
 
-### Introduction
+## 0. Introduction
+
 
 如果你需要做预测，那么你需要XGBoost。XGBoost算法已经成为许多数据科学家的终极武器。 这是一个非常复杂的算法，足以处理各种不规则的数据
 
@@ -12,11 +13,11 @@
 这篇问孩子那个适合XGBoost的初学者，在这篇文章中，我们将学习XGBoost的调参技巧，同时了解一些XGBoost的有用信息。而且我们使用pyton，将算法应用到了一个实际任务上。
 
 
-### What should you know？
+#### What should you know？
 
 XGBoost(eXtreme Gradient Boosting) 是梯度提升的一种新的实现。阅读这篇文章之前，你至少需要知道Gradient Boosting是什么玩意儿。
 
-### Table of Contents
+#### Table of Contents
 
 1、XGBoost的优势
 
@@ -24,7 +25,8 @@ XGBoost(eXtreme Gradient Boosting) 是梯度提升的一种新的实现。阅读
 
 3、调参
 
-### 1. XGBoost的优势
+## 1. XGBoost的优势
+
 
 我非常欣赏这种算法为预测模型加入的boosting性能。它具有如下的优势：
 
