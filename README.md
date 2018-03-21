@@ -1,6 +1,8 @@
 
 # XGBoost python调参完整指南
 
+翻译自：https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/
+
 ### Introduction
 
 如果你需要做预测，那么你需要XGBoost。XGBoost算法已经成为许多数据科学家的终极武器。 这是一个非常复杂的算法，足以处理各种不规则的数据
